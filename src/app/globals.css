@@ -1,0 +1,230 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0a0a1a;
+  --fg: #e2e8f0; /* slate-200 */
+  --muted: #94a3b8; /* slate-400 */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --panel: rgba(255, 255, 255, 0.04);
+  --panel-2: rgba(255, 255, 255, 0.07);
+
+  /* фирменный градиент: синий → фиолетовый → розовый */
+  --grad: linear-gradient(120deg, #4f7bff 0%, #8b5cf6 50%, #e879f9 100%);
+  --grad-btn: linear-gradient(120deg, #4f7bff 0%, #9333ea 100%);
+}
+
+html,
+body {
+  min-height: 100%;
+  color: var(--fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(1100px 520px at 85% -8%, rgba(124, 58, 237, 0.28), transparent 60%),
+    radial-gradient(820px 520px at 8% -2%, rgba(37, 99, 235, 0.20), transparent 55%),
+    radial-gradient(900px 600px at 50% 110%, rgba(168, 85, 247, 0.12), transparent 60%);
+  background-attachment: fixed;
+}
+
+/* ───────── layout ───────── */
+.container-page {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* ───────── gradient helpers ───────── */
+.text-gradient {
+  background: var(--grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.logo-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 0.55rem;
+  background: var(--grad-btn);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
+  box-shadow: 0 6px 18px -6px rgba(124, 58, 237, 0.7);
+}
+
+/* ───────── buttons ───────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.7rem;
+  padding: 0.7rem 1.4rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1;
+  transition: all 0.18s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--grad-btn);
+  color: #fff;
+  box-shadow: 0 10px 26px -10px rgba(124, 58, 237, 0.8);
+}
+.btn-primary:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 12px 30px -10px rgba(124, 58, 237, 0.95);
+}
+
+.btn-outline {
+  border: 1px solid var(--border-strong);
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.04);
+}
+.btn-outline:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.btn-light {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: 1px solid var(--border-strong);
+}
+.btn-light:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* ───────── surfaces ───────── */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  backdrop-filter: blur(8px);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease,
+    background 0.18s ease;
+}
+.card-hover:hover {
+  border-color: var(--border-strong);
+  background: var(--panel-2);
+  box-shadow: 0 20px 50px -24px rgba(124, 58, 237, 0.55);
+  transform: translateY(-3px);
+}
+
+.input {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.7rem;
+  padding: 0.7rem 0.85rem;
+  font-size: 0.95rem;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--fg);
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.input::placeholder {
+  color: #64748b;
+}
+.input:focus {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.25);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.72rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 9999px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.78rem;
+  color: #c4b5fd;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* секция с чуть более тёмной подложкой */
+.section-alt {
+  background: rgba(255, 255, 255, 0.025);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Глобальная адаптация светлых utility-классов под тёмную тему.
+   Правила вне @layer перекрывают Tailwind-утилиты, поэтому все
+   страницы становятся тёмными без правки каждого файла.
+   ───────────────────────────────────────────────────────────── */
+.text-slate-900 { color: #ffffff; }
+.text-slate-800 { color: #e2e8f0; }
+.text-slate-700 { color: #cbd5e1; }
+.text-slate-600 { color: #cbd5e1; }
+.text-slate-500 { color: #94a3b8; }
+.text-blue-600 { color: #818cf8; }
+
+.bg-white { background-color: rgba(255, 255, 255, 0.04); }
+.bg-slate-50 { background-color: rgba(255, 255, 255, 0.03); }
+.bg-slate-100 { background-color: rgba(255, 255, 255, 0.08); }
+.bg-slate-200 { background-color: rgba(255, 255, 255, 0.12); }
+.bg-slate-900 { background-image: var(--grad-btn); background-color: transparent; }
+
+.border-slate-200 { border-color: rgba(255, 255, 255, 0.10); }
+.border-slate-300 { border-color: rgba(255, 255, 255, 0.16); }
+.border-slate-400 { border-color: rgba(255, 255, 255, 0.22); }
+/* «выбранное» состояние (фильтры/переключатели) = градиент без тёмной рамки */
+.border-slate-900 { border-color: transparent; }
+.divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(255, 255, 255, 0.10);
+}
+
+.hover\:bg-slate-50:hover { background-color: rgba(255, 255, 255, 0.06); }
+.hover\:bg-slate-800:hover { background-image: var(--grad-btn); filter: brightness(1.08); }
+.hover\:border-slate-400:hover { border-color: rgba(255, 255, 255, 0.22); }
+
+/* цветные статус-плашки (успех / предупреждение / ошибка) */
+.bg-emerald-50 { background-color: rgba(16, 185, 129, 0.12); }
+.border-emerald-200 { border-color: rgba(16, 185, 129, 0.30); }
+.text-emerald-800 { color: #6ee7b7; }
+.text-emerald-600 { color: #34d399; }
+.bg-amber-50 { background-color: rgba(245, 158, 11, 0.12); }
+.border-amber-200 { border-color: rgba(245, 158, 11, 0.30); }
+.text-amber-800 { color: #fcd34d; }
+.text-amber-700 { color: #fbbf24; }
+.bg-red-50 { background-color: rgba(239, 68, 68, 0.12); }
+.border-red-200 { border-color: rgba(239, 68, 68, 0.30); }
+.text-red-600 { color: #f87171; }
+
+/* инпуты, заданные «сырыми» классами, тоже делаем читаемыми */
+input,
+textarea,
+select {
+  color: var(--fg);
+}
+input::placeholder,
+textarea::placeholder {
+  color: #64748b;
+}
+option {
+  color: #0f172a;
+}

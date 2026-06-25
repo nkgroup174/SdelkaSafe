@@ -1,0 +1,331 @@
+// SdelkaSafe 2.0 — схема БД
+// Два каталога (товары + услуги) через единую модель Listing с дискриминатором type.
+// Не-кастодиальная оплата: платформа не хранит деньги сделки; комиссия списывается
+// с внутреннего баланса поставщика (success-fee).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── ENUMS ─────────────────────────
+
+enum Role {
+  CUSTOMER // заказчик
+  SUPPLIER // поставщик
+  ADMIN
+}
+
+enum ListingType {
+  PRODUCT // товар (каталог как Авито/опт)
+  SERVICE // услуга (каталог как Профи.ру)
+}
+
+enum ListingStatus {
+  DRAFT
+  PENDING // на модерации
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
+enum ServiceUnit {
+  HOUR
+  DAY
+  PROJECT
+  MONTH
+}
+
+enum DealStatus {
+  PENDING // создана, ждёт оплаты
+  PAID // покупатель оплатил (есть txHash), товар/услуга в работе
+  COMPLETED // покупатель подтвердил получение
+  CANCELLED
+  DISPUTED // спор/арбитраж
+}
+
+enum BalanceTxType {
+  DEPOSIT // поставщик пополнил баланс
+  COMMISSION // списание success-fee за сделку
+  REFUND
+  ADJUSTMENT // ручная корректировка админом
+}
+
+// ───────────────────────── MODELS ─────────────────────────
+
+model User {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  password   String
+  name       String?
+  phone      String?
+  role       Role     @default(CUSTOMER)
+  telegramId String?  @unique
+  tonWallet  String? // адрес кошелька TON (для приёма оплат, если поставщик)
+  avatarUrl  String? // аватар / логотип компании
+  about      String? // описание компании
+  city       String?
+  website    String?
+  inn        String?
+  ogrn       String?
+  isVerified Boolean  @default(false) // бейдж «Проверенный поставщик»
+  isBlocked  Boolean  @default(false)
+  // Подтверждение email
+  emailVerified      Boolean   @default(false)
+  emailVerifyCode    String?
+  emailVerifyExpires DateTime?
+  // Реферальная программа
+  referralCode String?  @unique
+  referredById String?
+  // Внутренний баланс комиссий поставщика в рублях (для success-fee, не-кастодиально)
+  balanceRub Float    @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  listings      Listing[]
+  dealsAsBuyer  Deal[]            @relation("BuyerDeals")
+  dealsAsSeller Deal[]            @relation("SellerDeals")
+  messages      Message[]
+  reviews       Review[]          @relation("ReviewsGiven")
+  favorites     Favorite[]
+  balanceTxs    BalanceTransaction[]
+  viewHistory   ViewHistory[]
+  comparisons   ComparisonItem[]
+  reports       Report[]          @relation("Reporter")
+  subscriptions CategorySubscription[]
+  offersAsBuyer  Offer[]          @relation("OfferBuyer")
+  offersAsSeller Offer[]          @relation("OfferSeller")
+  referredBy    User?             @relation("Referrals", fields: [referredById], references: [id])
+  referrals     User[]            @relation("Referrals")
+}
+
+model Listing {
+  id          String        @id @default(uuid())
+  type        ListingType
+  title       String
+  description String
+  category    String        @default("OTHER")
+  subcategory String? // подкатегория (двухуровневый каталог)
+  priceRub    Float // цена в рублях; в TON конвертируем в момент оплаты
+  oldPriceRub Float? // старая цена (для показа скидки)
+  imageUrl    String? // основное фото (для карточек) = images[0]
+  images      String[] @default([]) // галерея фото
+  status      ListingStatus @default(PENDING)
+
+  // Поля товара (type = PRODUCT)
+  stock Int?
+  moq   Int? // минимальный объём заказа
+  brand String?
+
+  // Поля услуги (type = SERVICE)
+  unit     ServiceUnit?
+  duration String?
+
+  boostedUntil DateTime? // продвижение: до какого времени объявление в топе
+
+  supplierId String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  supplier    User             @relation(fields: [supplierId], references: [id])
+  deals       Deal[]
+  favorites   Favorite[]
+  viewHistory ViewHistory[]
+  comparisons ComparisonItem[]
+  reports     Report[]
+  offers      Offer[]
+
+  @@index([type, status])
+  @@index([category])
+  @@index([supplierId])
+}
+
+model Deal {
+  id          String     @id @default(uuid())
+  orderNumber String     @unique
+  listingId   String
+  buyerId     String
+  sellerId    String
+  quantity    Int        @default(1)
+  amountRub   Float // сумма сделки в рублях
+  amountTon   Float? // сумма в TON на момент оплаты
+  tonRate     Float? // курс RUB/TON на момент оплаты
+  commissionRub Float    @default(0) // success-fee платформы
+  discountRub Float      @default(0) // скидка по промокоду
+  promoCodeId String?
+  disputeReason String? // причина открытого спора
+  status      DealStatus @default(PENDING)
+  txHash      String? // хэш транзакции покупатель→поставщик в сети TON
+  isArchived  Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  listing   Listing    @relation(fields: [listingId], references: [id])
+  buyer     User       @relation("BuyerDeals", fields: [buyerId], references: [id])
+  seller    User       @relation("SellerDeals", fields: [sellerId], references: [id])
+  promoCode PromoCode? @relation(fields: [promoCodeId], references: [id])
+  messages  Message[]
+  review    Review?
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([status])
+}
+
+enum DiscountType {
+  PERCENT // процент от суммы
+  FIXED // фиксированная сумма в рублях
+}
+
+model PromoCode {
+  id          String       @id @default(uuid())
+  code        String       @unique
+  type        DiscountType @default(PERCENT)
+  value       Float // % или рубли в зависимости от type
+  minOrderRub Float        @default(0)
+  maxUses     Int? // null = без лимита
+  usedCount   Int          @default(0)
+  isActive    Boolean      @default(true)
+  expiresAt   DateTime?
+  createdAt   DateTime     @default(now())
+
+  deals Deal[]
+}
+
+model ViewHistory {
+  id        String   @id @default(uuid())
+  userId    String
+  listingId String
+  viewedAt  DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+  @@index([userId])
+}
+
+model ComparisonItem {
+  id        String   @id @default(uuid())
+  userId    String
+  listingId String
+  addedAt   DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+  @@index([userId])
+}
+
+model Report {
+  id         String   @id @default(uuid())
+  listingId  String
+  reporterId String
+  reason     String
+  resolved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  listing  Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  reporter User    @relation("Reporter", fields: [reporterId], references: [id])
+
+  @@index([resolved])
+}
+
+model CategorySubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  category  String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category])
+  @@index([category])
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+}
+
+model Offer {
+  id              String      @id @default(uuid())
+  listingId       String
+  buyerId         String
+  sellerId        String
+  offeredPriceRub Float // предложенная цена за единицу
+  quantity        Int         @default(1)
+  message         String?
+  status          OfferStatus @default(PENDING)
+  dealId          String? // созданная сделка при принятии
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyer   User    @relation("OfferBuyer", fields: [buyerId], references: [id])
+  seller  User    @relation("OfferSeller", fields: [sellerId], references: [id])
+
+  @@index([sellerId, status])
+  @@index([buyerId])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  dealId    String
+  senderId  String
+  text      String
+  createdAt DateTime @default(now())
+
+  deal   Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  sender User @relation(fields: [senderId], references: [id])
+
+  @@index([dealId])
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  dealId    String   @unique
+  authorId  String
+  rating    Int // 1..5
+  comment   String
+  reply     String? // ответ поставщика
+  createdAt DateTime @default(now())
+
+  deal   Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  author User @relation("ReviewsGiven", fields: [authorId], references: [id])
+}
+
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String
+  listingId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+}
+
+// Движение по внутреннему балансу поставщика (комиссии). Деньги сделки сюда НЕ попадают —
+// только депозиты поставщика и списания success-fee.
+model BalanceTransaction {
+  id        String        @id @default(uuid())
+  userId    String
+  type      BalanceTxType
+  amountRub Float
+  dealId    String?
+  note      String?
+  createdAt DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}

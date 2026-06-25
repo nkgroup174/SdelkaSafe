@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sdelka-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sdelka
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sdelka_pass}
+      POSTGRES_DB: sdelka_db
+    ports:
+      # доступ к БД только с самого сервера (для админ-инструментов через SSH-туннель)
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sdelka"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: sdelka-web
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Внутри docker-сети web подключается к БД по имени сервиса postgres:5432
+      DATABASE_URL: postgresql://sdelka:${POSTGRES_PASSWORD:-sdelka_pass}@postgres:5432/sdelka_db?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      # слушаем только localhost — наружу проксирует Nginx
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - uploads:/app/public/uploads
+
+volumes:
+  pgdata:
+  uploads:
